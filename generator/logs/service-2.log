@@ -1,0 +1,12 @@
+{"timestamp": "2026-10-20T18:59:07.216+00:00", "level": "INFO", "service": "service-2", "trace_ID": "f48b7021-491e-4a93-84ed-9a8cfa1b62a9", "status_code": 204, "latency": 399}
+{"timestamp": "2026-10-20T18:59:07.519+00:00", "level": "INFO", "service": "service-2", "trace_ID": "f30c6c4f-8b68-448a-acc0-197115a8db3f", "status_code": 200, "latency": 125}
+{"timestamp": "2026-10-20T18:59:07.569+00:00", "level": "INFO", "service": "service-2", "trace_ID": "898257a1-d095-480d-bd4a-147bb2ffd40f", "status_code": 201, "latency": 655}
+{"timestamp": "2026-10-20T18:59:08.069+00:00", "level": "WARN", "service": "service-2", "trace_ID": "96969dfc-f2aa-4e1f-9bd3-d9479d756c1d", "status_code": 400, "latency": 240}
+{"timestamp": "2026-10-20T18:59:08.119+00:00", "level": "WARN", "service": "service-2", "trace_ID": "d3cc18f8-12ed-4905-a897-0c878e179591", "status_code": 400, "latency": 556}
+{"timestamp": "2026-10-20T18:59:08.366+00:00", "level": "INFO", "service": "service-2", "trace_ID": "3aa07ff4-5beb-401b-a0a9-0eea972631be", "status_code": 201, "latency": 172}
+{"timestamp": "2026-10-20T18:59:08.817+00:00", "level": "INFO", "service": "service-2", "trace_ID": "6ab8981c-fa5d-4a92-9728-f596573438ba", "status_code": 201, "latency": 87}
+{"timestamp": "2026-10-20T18:59:08.867+00:00", "level": "WARN", "service": "service-2", "trace_ID": "a466c198-ead8-4b90-aa9f-38fc054d29b1", "status_code": 404, "latency": 211}
+{"timestamp": "2026-10-20T18:59:08.966+00:00", "level": "INFO", "service": "service-2", "trace_ID": "18ac13e5-0b78-4384-b2ed-53cf50ff2136", "status_code": 204, "latency": 620}
+{"timestamp": "2026-10-20T19:39:11.153+00:00", "level": "INFO", "service": "service-2", "trace_ID": "b942d111-d8b6-41ff-838d-9ef85d015e16", "status_code": 201, "latency": 220}
+{"timestamp": "2026-10-20T19:39:17.159+00:00", "level": "INFO", "service": "service-2", "trace_ID": "e0311859-29c9-4404-94d8-aba9be18999f", "status_code": 204, "latency": 669}
+{"timestamp": "2026-10-20T19:39:19.158+00:00", "level": "INFO", "service": "service-2", "trace_ID": "39c2dec1-ef21-4665-993f-fff9f22c65de", "status_code": 200, "latency": 448}

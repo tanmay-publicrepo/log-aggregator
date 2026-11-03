@@ -4,6 +4,8 @@ services:
     container_name: kafka
     ports:
       - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -36,6 +38,11 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   connect:
     image: confluentinc/cp-kafka-connect:7.7.0
@@ -78,3 +85,34 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://connect:8083
+
+  shipper:
+    build:
+      context: ..
+      dockerfile: shipper/Dockerfile
+    container_name: shipper
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      LOGS_TOPIC: logs.raw
+      FILE_GLOB: "*.log"
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    volumes:
+      - ../data/logs:/logs:ro
+    ports:
+      - "8090:8090"
+    mem_limit: 512m
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8081'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+volumes:
+  kafka-data:

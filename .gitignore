@@ -8,3 +8,11 @@ build
 .kotlin
 
 .venv/generator/out/
+
+.DS_Store
+
+.dockerignore
+
+.vscode/
+
+data/

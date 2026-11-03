@@ -1,109 +1,156 @@
+/**About this class - The main entry point for the log shipper application. It parses command-line arguments, initializes the necessary components (such as LogEventProducer, HealthServer, and FileTailer or TailerManager), and manages the application's lifecycle. It handles both file mode (tailing a single file) and directory mode (watching a directory for log files). The class also sets up a shutdown hook to gracefully stop the application and its components when a termination signal is received. */
+
 package dev.tanmay.logagg.shipper;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import dev.tanmay.logagg.model.LogEvent;
-
 public class ShipperApp {
 
     private static final Logger log = LoggerFactory.getLogger(ShipperApp.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String UNKNOWN_LEVEL = "UNKNOWN";
+
+    static final int EXIT_OK = 0;
+    static final int EXIT_FAILURE = 1;
+    static final int EXIT_USAGE = 2;
+
+    private static final String USAGE = "Usage: shipper <file-or-directory> [service-name]";
+    private static final Duration STOP_TIMEOUT = Duration.ofSeconds(5);
 
     public static void main(String[] args) {
-        if (args.length < 2) {
-            System.err.println("Usage: ShipperApp <log-file-path> <service-name>");
-            System.exit(2);
+        System.exit(execute(args));
+    }
+
+    static int execute(String[] args) {
+        ShipperConfig config;
+        try {
+            config = ShipperConfig.from(args, System.getenv());
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.err.println(USAGE);
+            return EXIT_USAGE;
         }
-        Path logFile = Path.of(args[0]);
-        String service = args[1];
 
-        String bootstrap = envOr("KAFKA_BOOTSTRAP", "localhost:9092");
-        String registryUrl = envOr("SCHEMA_REGISTRY_URL", "http://localhost:8081");
-        String topic = envOr("LOGS_TOPIC", "logs.raw");
-        String host = resolveHost();
+        log.info("Starting shipper with {}", config);
+        LogEventMapper mapper = LogEventMapper.forLocalHost();
+        return run(config, mapper);
+    }
 
-        log.info("Starting shipper: file={} service={} host={} bootstrap={} registry={} topic={}",
-                logFile, service, host, bootstrap, registryUrl, topic);
+    static int run(ShipperConfig config, LogEventMapper mapper) {
+        AtomicBoolean ready = new AtomicBoolean(false);
 
-        try (LogEventProducer producer = new LogEventProducer(bootstrap, registryUrl, topic)) {
-            FileTailer tailer = new FileTailer(logFile, line -> {
-                if (line.isBlank()) {
-                    return;
-                }
-                producer.send(toEvent(line, service, host));
-            });
+        try (LogEventProducer producer = new LogEventProducer(config);
+             HealthServer health = new HealthServer(config.healthPort(), ready::get)) {
 
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                log.info("Shutdown signal received");
-                tailer.stop();
-                producer.close();
-            }, "shipper-shutdown"));
+            health.start();
 
-            tailer.run();
+            if (config.isDirectoryMode()) {
+                return runDirectoryMode(config, mapper, producer, health, ready);
+            }
+            return runFileMode(config, mapper, producer, health, ready);
+
         } catch (IOException e) {
-            log.error("Failed while tailing {}", logFile, e);
-            System.exit(1);
+            log.error("I/O failure: {}", e.getMessage(), e);
+            return EXIT_FAILURE;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while running, shutting down");
+            return EXIT_FAILURE;
+        } catch (RuntimeException e) {
+            log.error("Fatal error", e);
+            return EXIT_FAILURE;
         }
     }
 
-    static LogEvent toEvent(String rawLine, String service, String host) {
-        LogEvent.Builder builder = LogEvent.newBuilder()
-                .setService(service)
-                .setHost(host)
-                .setRaw(rawLine)
-                .setTimestamp(Instant.now());
+    private static int runFileMode(ShipperConfig config, LogEventMapper mapper, LogEventProducer producer,
+                                   HealthServer health, AtomicBoolean ready) throws IOException {
+        String service = config.serviceOverride();
+        Consumer<String> consumer = line -> shipLine(mapper, producer, service, line);
+        FileTailer tailer = new FileTailer(config.path(), consumer, config.pollIntervalMs(), config.startAtEnd());
+        CountDownLatch tailerDone = new CountDownLatch(1);
 
-        String trimmed = rawLine.trim();
-        JsonNode json = trimmed.startsWith("{") ? parseJson(trimmed) : null;
+        registerShutdownHook(shutdownSequence(
+                () -> ready.set(false),
+                tailer::stop,
+                () -> awaitQuietly(tailerDone, STOP_TIMEOUT),
+                health::close,
+                producer::close));
 
-        if (json == null) {
-            return builder
-                    .setLevel(UNKNOWN_LEVEL)
-                    .setMessage(trimmed)
-                    .build();
-        }
-
-        return builder
-                .setLevel(json.path("level").asText(UNKNOWN_LEVEL))
-                .setMessage(json.path("message").asText(trimmed))
-                .setTraceId(json.path("trace_id").asText(null))
-                .build();
-    }
-
-    private static JsonNode parseJson(String text) {
+        ready.set(true);
+        log.info("Tailing {} as service {}", config.path(), service);
         try {
-            return MAPPER.readTree(text);
-        } catch (JsonProcessingException e) {
-            return null;
+            tailer.run();
+        } finally {
+            tailerDone.countDown();
+        }
+        return EXIT_OK;
+    }
+
+    private static int runDirectoryMode(ShipperConfig config, LogEventMapper mapper, LogEventProducer producer,
+                                        HealthServer health, AtomicBoolean ready) throws InterruptedException {
+        Function<Path, Consumer<String>> consumerFactory = path -> {
+            String service = TailerManager.serviceNameFor(path);
+            return line -> shipLine(mapper, producer, service, line);
+        };
+
+        try (TailerManager manager = new TailerManager(config, consumerFactory)) {
+            CountDownLatch stopped = new CountDownLatch(1);
+
+            registerShutdownHook(shutdownSequence(
+                    () -> ready.set(false),
+                    manager::close,
+                    health::close,
+                    producer::close,
+                    stopped::countDown));
+
+            manager.start();
+            ready.set(true);
+            log.info("Watching {} for {}", config.path(), config.fileGlob());
+            stopped.await();
+            return EXIT_OK;
         }
     }
 
-    private static String resolveHost() {
+    static void shipLine(LogEventMapper mapper, LogEventProducer producer, String service, String line) {
+        if (line.isBlank()) {
+            return;
+        }
+        producer.send(mapper.toEvent(line, service));
+    }
+
+    static Runnable shutdownSequence(Runnable... steps) {
+        return () -> {
+            log.info("Shutdown signal received");
+            for (int i = 0; i < steps.length; i++) {
+                try {
+                    steps[i].run();
+                } catch (Exception e) {
+                    log.error("Shutdown step {} failed", i, e);
+                }
+            }
+            log.info("Shutdown complete");
+        };
+    }
+
+    private static void registerShutdownHook(Runnable sequence) {
+        Runtime.getRuntime().addShutdownHook(new Thread(sequence, "shipper-shutdown"));
+    }
+
+    private static void awaitQuietly(CountDownLatch latch, Duration timeout) {
         try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            log.warn("Could not resolve local hostname, using 'unknown'", e);
-            return "unknown";
+            if (!latch.await(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+                log.warn("Tailer did not stop within {}", timeout);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
-    }
-
-    private static String envOr(String envVar, String defaultValue) {
-        String value = System.getenv(envVar);
-        if (value == null || value.isBlank()) {
-            return defaultValue;
-        }
-        return value;
     }
 }
