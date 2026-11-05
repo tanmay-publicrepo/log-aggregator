@@ -18,3 +18,7 @@ build
 data/
 
 genererator/
+
+infra/plugins/*
+
+!infra/plugins/.gitkeep
