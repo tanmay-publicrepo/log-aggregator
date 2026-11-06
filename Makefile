@@ -2,8 +2,9 @@ PY ?= python3
 LOG_DIR ?= /tmp/logs
 Rate ?= 1000
 COMPOSE ?= docker compose -f infra/compose.yaml
+CONNECT_SH ?= infra/scripts/connect.sh
 
-.PHONY: gen gen-load gen-test build test up down logs
+.PHONY: gen gen-load gen-test build test up down logs connect-plugins os-template connector-up connector-status connector-down os-count
 
 gen:
 	$(PY) generator/generate.py --services 4 --rate 5 --malformed-pct 2 --log-dir $(LOG_DIR)
@@ -28,3 +29,21 @@ down:
 
 logs:
 	$(COMPOSE) logs -f $(S)
+
+connect-plugins:
+	$(CONNECT_SH) plugin
+
+os-template:
+	$(CONNECT_SH) template
+
+connector-up:
+	$(CONNECT_SH) up
+
+connector-status:
+	$(CONNECT_SH) status
+
+connector-down:
+	$(CONNECT_SH) down
+
+os-count:
+	curl -s localhost:9200/logs.raw/_count | jq .count
