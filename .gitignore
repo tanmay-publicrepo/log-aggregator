@@ -17,7 +17,7 @@ build
 
 data/
 
-genererator/
+generator/
 
 infra/plugins/*
 
