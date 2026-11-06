@@ -1,0 +1,24 @@
+{
+  "index_patterns": ["logs.raw*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "1s"
+    },
+    "mappings": {
+      "properties": {
+        "service":         { "type": "keyword" },
+        "host":            { "type": "keyword" },
+        "timestamp":       { "type": "date" },
+        "level":           { "type": "keyword" },
+        "message":         { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 1024 } } },
+        "trace_id":        { "type": "keyword" },
+        "raw":             { "type": "text", "index": false },
+        "kafka_partition": { "type": "integer" },
+        "kafka_offset":    { "type": "long" }
+      }
+    }
+  }
+}
