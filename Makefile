@@ -22,7 +22,7 @@ test:
 	./gradlew test
 
 up:
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d --build
 
 down:
 	$(COMPOSE) down
@@ -47,3 +47,9 @@ connector-down:
 
 os-count:
 	curl -s localhost:9200/logs.raw/_count | jq .count
+
+verify:
+	infra/scripts/verify.sh
+
+clean:
+	$(COMPOSE) down -v

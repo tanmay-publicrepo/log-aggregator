@@ -16,14 +16,16 @@
   "value.converter": "io.confluent.connect.avro.AvroConverter",
   "value.converter.schema.registry.url": "http://schema-registry:8081",
 
-  "transforms": "ts,meta",
+  "transforms": "ts,meta,drop",
   "transforms.ts.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
   "transforms.ts.field": "timestamp",
+  "transforms.drop.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
   "transforms.ts.target.type": "string",
   "transforms.ts.format": "yyyy-MM-dd'T'HH:mm:ss.SSSX",
   "transforms.meta.type": "org.apache.kafka.connect.transforms.InsertField$Value",
   "transforms.meta.partition.field": "kafka_partition",
   "transforms.meta.offset.field": "kafka_offset",
+  "transforms.drop.exclude": "raw",
 
   "errors.tolerance": "all",
   "errors.log.enable": "true",
