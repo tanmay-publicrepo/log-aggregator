@@ -3,4 +3,4 @@ plugins {
 }
 
 rootProject.name = "log-aggregator"
-include("shipper", "processor", "postgres-sink-connector")
+include("model", "shipper", "processor", "postgres-sink-connector")

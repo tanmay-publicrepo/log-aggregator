@@ -5,9 +5,11 @@ WORKDIR /src
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle/ gradle/
 COPY shipper/build.gradle.kts shipper/
+COPY model/build.gradle.kts model/
 COPY processor/build.gradle.kts processor/
 COPY postgres-sink-connector/build.gradle.kts postgres-sink-connector/
 COPY shipper/src/ shipper/src/
+COPY model/src/ model/src/
 RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.gradle ./gradlew :shipper:installDist --no-daemon
 
