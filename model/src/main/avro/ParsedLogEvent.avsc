@@ -14,6 +14,9 @@
     { "name": "status_code", "type": ["null", "int"], "default": null },
     { "name": "latency_ms", "type": ["null", "long"], "default": null },
     { "name": "format", "type": "string", "doc": "JSON or TEXT" },
+    { "name": "region", "type": "string", "default": "unknown", "doc": "deployment region, from processor config" },
+    { "name": "env", "type": "string", "default": "unknown", "doc": "deployment environment, from processor config" },
+    { "name": "sampled", "type": "boolean", "default": false, "doc": "true when this record survived sampling" },
     { "name": "raw", "type": "string" }
   ]
 }
