@@ -26,10 +26,17 @@ public class TopologyBuilder {
 
     private final ProcessorConfig config;
     private final LineParser parser;
+    private final Enricher enricher;
+    private final NoiseFilter noiseFilter;
+    private final Sampler sampler;
 
-    public TopologyBuilder(ProcessorConfig config, LineParser parser) {
+    public TopologyBuilder(ProcessorConfig config, LineParser parser, Enricher enricher,
+                           NoiseFilter noiseFilter, Sampler sampler) {
         this.config = config;
         this.parser = parser;
+        this.enricher = enricher;
+        this.noiseFilter = noiseFilter;
+        this.sampler = sampler;
     }
 
     public Topology build() {
@@ -47,6 +54,10 @@ public class TopologyBuilder {
 
         branches.get(BRANCH_OK)
                 .mapValues(ParseOutcome::event, Named.as("unwrap-parsed"))
+                .mapValues(enricher::enrich, Named.as("enrich"))
+                .filter((key, event) -> noiseFilter.keep(event), Named.as("drop-noisy-debug"))
+                .filter((key, event) -> sampler.keep(event), Named.as("sample"))
+                .mapValues(sampler::mark, Named.as("mark-sampled"))
                 .to(config.parsedTopic(), Produced.with(Serdes.String(), avroSerde(ParsedLogEvent.class)));
 
         branches.get(BRANCH_FAILED)
