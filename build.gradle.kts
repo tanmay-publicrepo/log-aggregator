@@ -16,4 +16,13 @@ subprojects {
     }
     tasks.withType<Test> { useJUnitPlatform() }
     tasks.withType<JavaCompile> { options.encoding = "UTF-8" }
+
+    configurations.all {
+    resolutionStrategy {
+        force(
+            "org.apache.kafka:kafka-clients:3.9.0",
+            "org.apache.kafka:kafka-streams:3.9.0"
+        )
+    }
+}
 }

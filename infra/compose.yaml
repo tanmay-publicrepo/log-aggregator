@@ -26,8 +26,6 @@ services:
       timeout: 5s
       retries: 10
 
-  
-
   schema-registry:
     image: confluentinc/cp-schema-registry:7.7.0
     container_name: schema-registry
@@ -103,6 +101,23 @@ services:
       - apk add --no-cache bash curl jq >/dev/null && bash /infra/scripts/connect.sh up
     restart: "no"    
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for t in logs.raw logs.parsed logs.dlq; do
+          kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists \
+            --topic "$$t" --partitions 6 --replication-factor 1
+        done
+        kafka-topics --bootstrap-server kafka:29092 --list
+    restart: "no"
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -116,6 +131,28 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
       KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://connect:8083
+
+  processor:
+    build:
+      context: ..
+      dockerfile: processor/Dockerfile
+    image: log-aggregator/processor:dev
+    container_name: processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      STREAMS_APPLICATION_ID: log-processor
+      STREAM_THREADS: "2"
+      JAVA_OPTS: -XX:MaxRAMPercentage=75
+    mem_limit: 768m
+    restart: on-failure
 
   shipper:
     build:

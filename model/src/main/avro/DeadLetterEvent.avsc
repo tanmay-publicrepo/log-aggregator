@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "DeadLetterEvent",
+  "namespace": "dev.tanmay.logagg.model",
+  "doc": "A record the processor could not handle, with the reason",
+  "fields": [
+    { "name": "service", "type": "string" },
+    { "name": "host", "type": "string" },
+    { "name": "ingest_time", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "failed_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "stage", "type": "string", "doc": "which step failed, e.g. parse" },
+    { "name": "error", "type": "string" },
+    { "name": "raw", "type": "string" }
+  ]
+}
