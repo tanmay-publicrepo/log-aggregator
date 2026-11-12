@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.streams.KafkaStreams;
@@ -36,7 +37,17 @@ public class ProcessorApp {
         }
         log.info("Starting processor with {}", config);
 
-        Topology topology = new TopologyBuilder(config, new LineParser()).build();
+          LineParser parser = new LineParser();
+        Enricher enricher = new Enricher(config.region(), config.env());
+        NoiseFilter noiseFilter = new NoiseFilter(config.noisyServices());
+        Sampler sampler = new Sampler(config.sampleService(), config.sampleRate(),
+                () -> ThreadLocalRandom.current().nextDouble());
+        Topology topology = new TopologyBuilder(config, parser, enricher, noiseFilter, sampler).build();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(
+                () -> log.info("Dropped {} noisy DEBUG records and sampled out {} records",
+                        noiseFilter.dropped(), sampler.dropped()),
+                "processor-report"));
         log.info("Topology:\n{}", topology.describe());
         return run(config, topology);
     }
