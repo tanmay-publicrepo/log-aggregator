@@ -10,7 +10,7 @@ INDEX_NAME="${INDEX_NAME:-logs.raw}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$SCRIPT_DIR/../plugins/opensearch-sink"
-CONFIG_FILE="$SCRIPT_DIR/../connectors/opensearch-sink.json"
+CONFIG_FILE="${CONFIG_FILE:-$SCRIPT_DIR/../connectors/opensearch-sink.json}"
 TEMPLATE_FILE="$SCRIPT_DIR/../opensearch/logs-raw-template.json"
 
 usage() {
@@ -115,6 +115,11 @@ main() {
       wait_for_http "$CONNECT_URL/connectors" "Kafka Connect"
       wait_for_http "$OPENSEARCH_URL" "OpenSearch"
       apply_template
+      register_connector
+      wait_for_running
+      ;;
+       register)
+      wait_for_http "$CONNECT_URL/connectors" "Kafka Connect"
       register_connector
       wait_for_running
       ;;

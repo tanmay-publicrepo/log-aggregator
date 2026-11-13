@@ -1,0 +1,22 @@
+{
+  "connector.class": "dev.tanmay.logagg.connector.PostgresSinkConnector",
+  "tasks.max": "2",
+  "topics": "logs.parsed",
+
+  "connection.url": "jdbc:postgresql://postgres:5432/logs",
+  "connection.user": "logs",
+  "connection.password": "logs",
+  "table.name": "parsed_logs",
+  "batch.size": "500",
+
+  "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+  "value.converter": "io.confluent.connect.avro.AvroConverter",
+  "value.converter.schema.registry.url": "http://schema-registry:8081",
+
+  "errors.tolerance": "all",
+  "errors.log.enable": "true",
+  "errors.log.include.messages": "true",
+  "errors.deadletterqueue.topic.name": "logs.connect-dlq",
+  "errors.deadletterqueue.topic.replication.factor": "1",
+  "errors.deadletterqueue.context.headers.enable": "true"
+}

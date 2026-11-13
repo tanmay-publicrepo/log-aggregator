@@ -218,6 +218,24 @@ services:
     ports:
       - "5601:5601"
 
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_DB: logs
+      POSTGRES_USER: logs
+      POSTGRES_PASSWORD: logs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logs -d logs"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
 volumes:
   kafka-data:
   opensearch-data:
+  postgres-data:

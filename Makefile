@@ -3,6 +3,8 @@ LOG_DIR ?= /tmp/logs
 Rate ?= 1000
 COMPOSE ?= docker compose -f infra/compose.yaml
 CONNECT_SH ?= infra/scripts/connect.sh
+PG_CONNECTOR = postgres-sink-logs-parsed
+PG_CONFIG    = infra/connectors/postgres-sink.json
 
 .PHONY: gen gen-load gen-test build test up down logs connect-plugins os-template connector-up connector-status connector-down os-count
 
@@ -53,3 +55,16 @@ verify:
 
 clean:
 	$(COMPOSE) down -v
+
+pg-plugin:
+	./gradlew :postgres-sink-connector:installPlugin
+	$(COMPOSE) restart connect
+
+pg-connector-up:
+	CONNECTOR_NAME=$(PG_CONNECTOR) CONFIG_FILE=$(PG_CONFIG) $(CONNECT_SH) register
+
+pg-connector-status:
+	CONNECTOR_NAME=$(PG_CONNECTOR) $(CONNECT_SH) status
+
+pg-connector-down:
+	CONNECTOR_NAME=$(PG_CONNECTOR) $(CONNECT_SH) down
