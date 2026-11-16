@@ -1,60 +1,121 @@
 package dev.tanmay.logagg.connector;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.sql.Connection;
+import java.sql.SQLException;
+import org.apache.kafka.connect.errors.ConnectException;
+
 
 public class PostgresSinkTask extends SinkTask {
 
+    static final long MAX_BACKOFF_MS = 30_000L;
     private static final Logger LOG = LoggerFactory.getLogger(PostgresSinkTask.class);
-
+        private final Function<PostgresSinkConfig, PostgresWriter> writerFactory;
     private PostgresSinkConfig config;
-    private final List<SinkRecord> buffer = new ArrayList<>();
+    private PostgresWriter writer;
     private long received;
-        @Override
-    public String version() {
-        return PostgresSinkConnector.VERSION;
+    private long written;
+    private int attempt;
+    private int remainingRetries;
+
+    public PostgresSinkTask() {
+        this(PostgresWriter::new);
+    }
+
+    PostgresSinkTask(Function<PostgresSinkConfig, PostgresWriter> writerFactory) {
+        this.writerFactory = writerFactory;
     }
 
     @Override
-    public void start(Map<String, String> props) {
-        config = new PostgresSinkConfig(props);
-        LOG.info("PostgresSinkTask started: table={} batchSize={}", config.tableName(), config.batchSize());
+    public String version() {
+        return PostgresSinkConnector.VERSION;
     }
         @Override
+    public void start(Map<String, String> props) {
+        config = new PostgresSinkConfig(props);
+        writer = writerFactory.apply(config);
+        remainingRetries = config.maxRetries();
+        LOG.info("PostgresSinkTask started: table={} batchSize={} maxRetries={}",
+                config.tableName(), config.batchSize(), config.maxRetries());
+    }
+
+    @Override
     public void put(Collection<SinkRecord> records) {
         if (records.isEmpty()) {
             return;
         }
-        SinkRecord first = records.iterator().next();
-        buffer.addAll(records);
         received += records.size();
-        LOG.info("put: received {} records (total {}), first {}-{}@{}", records.size(), received,
-                first.topic(), first.kafkaPartition(), first.kafkaOffset());
+        List<SinkRecord> batch = new ArrayList<>(records.size());
+        for (SinkRecord record : records) {
+            if (record.value() == null) {
+                LOG.debug("skipping tombstone {}-{}@{}", record.topic(), record.kafkaPartition(), record.kafkaOffset());
+                continue;
+            }
+            batch.add(record);
+        }
+        if (!batch.isEmpty()) {
+            writeWithRetry(batch);
+        }
+    }
+        private void writeWithRetry(List<SinkRecord> batch) {
+        try {
+            int inserted = writer.write(batch);
+            written += inserted;
+            attempt = 0;
+            remainingRetries = config.maxRetries();
+            LOG.debug("wrote {} rows ({} duplicates skipped), total written {}", inserted, batch.size() - inserted, written);
+        } catch (SQLException e) {
+            if (PostgresWriter.isRetriable(e) && remainingRetries > 0) {
+                long backoff = backoffMs();
+                attempt++;
+                remainingRetries--;
+                context.timeout(backoff);
+                LOG.warn("write failed ({}), retrying in {} ms, {} retries left", e.getMessage(), backoff, remainingRetries);
+                throw new RetriableException(e);
+            }
+            throw new ConnectException("Giving up after " + attempt + " retries: " + e.getMessage(), e);
+        }
+    }
+
+    private long backoffMs() {
+        return Math.min(config.retryBackoffMs() * (1L << attempt), MAX_BACKOFF_MS);
     }
         @Override
     public void flush(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-        LOG.info("flush: {} buffered records across {} partitions", buffer.size(), currentOffsets.size());
-        buffer.clear();
+        LOG.debug("flush: {} partitions, nothing buffered (writes are synchronous)", currentOffsets.size());
     }
 
     @Override
     public void stop() {
-        LOG.info("PostgresSinkTask stopped after {} records", received);
+        if (writer != null) {
+            writer.close();
+        }
+        LOG.info("PostgresSinkTask stopped: received={} written={}", received, written);
     }
 
     long received() {
         return received;
     }
 
-    int buffered() {
-        return buffer.size();
+    long written() {
+        return written;
+    }
+
+    int attempt() {
+        return attempt;
     }
 }

@@ -13,6 +13,7 @@ class PostgresSinkConnectorTest {
     private static final Map<String, String> PROPS = Map.of(
             PostgresSinkConfig.CONNECTION_URL, "jdbc:postgresql://localhost:5432/logs",
             PostgresSinkConfig.CONNECTION_USER, "logs",
+            PostgresSinkConfig.AUTO_CREATE, "false",
             PostgresSinkConfig.CONNECTION_PASSWORD, "logs");
 
                 @Test

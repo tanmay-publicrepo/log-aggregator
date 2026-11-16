@@ -68,3 +68,9 @@ pg-connector-status:
 
 pg-connector-down:
 	CONNECTOR_NAME=$(PG_CONNECTOR) $(CONNECT_SH) down
+
+pg-shell:
+	$(COMPOSE) exec postgres psql -U logs -d logs
+
+pg-count:
+	$(COMPOSE) exec postgres psql -U logs -d logs -c "SELECT count(*) AS rows, count(DISTINCT (kafka_partition, kafka_offset)) AS distinct_records FROM parsed_logs"

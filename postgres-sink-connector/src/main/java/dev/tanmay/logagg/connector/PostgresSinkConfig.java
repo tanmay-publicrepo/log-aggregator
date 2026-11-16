@@ -17,6 +17,7 @@ public class PostgresSinkConfig extends AbstractConfig {
     public static final String BATCH_SIZE = "batch.size";
     public static final String MAX_RETRIES = "max.retries";
     public static final String RETRY_BACKOFF_MS = "retry.backoff.ms";
+    public static final String AUTO_CREATE = "auto.create";
 
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
@@ -33,7 +34,9 @@ public class PostgresSinkConfig extends AbstractConfig {
             .define(MAX_RETRIES, Type.INT, 10, Range.atLeast(0), Importance.LOW,
                     "Retries of a failed batch before the task fails")
             .define(RETRY_BACKOFF_MS, Type.LONG, 500L, Range.atLeast(0), Importance.LOW,
-                    "Pause between retries in milliseconds");
+                    "Pause between retries in milliseconds")
+            .define(AUTO_CREATE, Type.BOOLEAN, true, Importance.LOW,
+                    "Create the target table at connector start if it does not exist");
 
         public PostgresSinkConfig(Map<String, String> props) {
         super(CONFIG_DEF, props);
@@ -46,4 +49,5 @@ public class PostgresSinkConfig extends AbstractConfig {
     public int batchSize()               { return getInt(BATCH_SIZE); }
     public int maxRetries()              { return getInt(MAX_RETRIES); }
     public long retryBackoffMs()         { return getLong(RETRY_BACKOFF_MS); }
+    public boolean autoCreate()          { return getBoolean(AUTO_CREATE); }
 }                

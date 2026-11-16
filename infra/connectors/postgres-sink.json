@@ -8,6 +8,9 @@
   "connection.password": "logs",
   "table.name": "parsed_logs",
   "batch.size": "500",
+  "auto.create": "true",
+  "max.retries": "10",
+  "retry.backoff.ms": "500",
 
   "key.converter": "org.apache.kafka.connect.storage.StringConverter",
   "value.converter": "io.confluent.connect.avro.AvroConverter",

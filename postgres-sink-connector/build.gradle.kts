@@ -2,12 +2,17 @@ dependencies {
     compileOnly("org.apache.kafka:connect-api:3.9.0")
     implementation("org.postgresql:postgresql:42.7.4")
     implementation("com.zaxxer:HikariCP:5.1.0")
+    implementation("org.assertj:assertj-core:3.27.7")
+    implementation("org.mockito:mockito-core:5.14.2")
     testImplementation("org.apache.kafka:connect-api:3.9.0")
     testImplementation("org.assertj:assertj-core:3.27.7")
+    testImplementation("org.testcontainers:postgresql:1.20.4")
+    testImplementation("org.testcontainers:junit-jupiter:1.20.4")
+    testImplementation("org.mockito:mockito-core:5.14.2")
 }
 
 val providedByWorker = listOf("kafka-clients", "connect-api", "slf4j", "logback", "snappy", "zstd", "lz4")
-
+tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
 tasks.register<Sync>("installPlugin") {
     group = "distribution"
     description = "Copy the connector jar and its third-party jars into infra/plugins/postgres-sink"

@@ -9,6 +9,9 @@ import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.sink.SinkConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.sql.Connection;
+import java.sql.SQLException;
+import org.apache.kafka.connect.errors.ConnectException;
 
 public class PostgresSinkConnector extends SinkConnector {
 
@@ -26,12 +29,25 @@ public class PostgresSinkConnector extends SinkConnector {
         PostgresSinkConfig config = new PostgresSinkConfig(props);   // throws ConfigException if invalid
         this.props = new HashMap<>(props);
         LOG.info("PostgresSinkConnector {} started, target table {}", VERSION, config.tableName());
+         if (config.autoCreate()) {
+            ensureTable(config);
+        }
+    }
+    
+     private static void ensureTable(PostgresSinkConfig config) {
+        try (Connection connection = PostgresWriter.openConnection(config)) {
+            ParsedLogsTable.ensure(connection, config.tableName());
+            LOG.info("table {} is ready", config.tableName());
+        } catch (SQLException e) {
+            throw new ConnectException("Could not prepare table " + config.tableName() + ": " + e.getMessage(), e);
+        }
     }
 
     @Override
     public Class<? extends Task> taskClass() {
         return PostgresSinkTask.class;
     }
+
         @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
         List<Map<String, String>> configs = new ArrayList<>(maxTasks);
