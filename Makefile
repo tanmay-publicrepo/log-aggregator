@@ -5,6 +5,8 @@ COMPOSE ?= docker compose -f infra/compose.yaml
 CONNECT_SH ?= infra/scripts/connect.sh
 PG_CONNECTOR = postgres-sink-logs-parsed
 PG_CONFIG    = infra/connectors/postgres-sink.json
+S3_CONNECTOR = s3-sink-logs-parsed
+S3_CONFIG    = infra/connectors/s3-sink.json
 
 .PHONY: gen gen-load gen-test build test up down logs connect-plugins os-template connector-up connector-status connector-down os-count
 
@@ -74,3 +76,18 @@ pg-shell:
 
 pg-count:
 	$(COMPOSE) exec postgres psql -U logs -d logs -c "SELECT count(*) AS rows, count(DISTINCT (kafka_partition, kafka_offset)) AS distinct_records FROM parsed_logs"
+
+s3-connector-up:
+	CONNECTOR_NAME=$(S3_CONNECTOR) CONFIG_FILE=$(S3_CONFIG) $(CONNECT_SH) register
+
+s3-connector-status:
+	CONNECTOR_NAME=$(S3_CONNECTOR) $(CONNECT_SH) status
+
+s3-connector-down:
+	CONNECTOR_NAME=$(S3_CONNECTOR) $(CONNECT_SH) down
+
+s3-ls:
+	$(COMPOSE) exec minio mc ls --recursive local/logs
+
+s3-cat:
+	$(COMPOSE) exec -T minio mc cat local/logs/$(KEY) > $(notdir $(KEY))

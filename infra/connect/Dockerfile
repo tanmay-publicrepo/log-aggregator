@@ -13,3 +13,4 @@ RUN curl -4 -fsSL --retry 5 --retry-all-errors --retry-delay 5 --connect-timeout
 
 FROM confluentinc/cp-kafka-connect:7.7.0
 COPY --from=downloader /plugins/opensearch-sink /usr/share/confluent-hub-components/opensearch-sink
+RUN confluent-hub install --no-prompt confluentinc/kafka-connect-s3:latest
