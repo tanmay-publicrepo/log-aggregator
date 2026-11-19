@@ -4,6 +4,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.assertj:assertj-core:3.27.7")
     implementation("org.mockito:mockito-core:5.14.2")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.15.4")
     testImplementation("org.apache.kafka:connect-api:3.9.0")
     testImplementation("org.assertj:assertj-core:3.27.7")
     testImplementation("org.testcontainers:postgresql:1.20.4")

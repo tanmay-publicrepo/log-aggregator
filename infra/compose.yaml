@@ -4,8 +4,10 @@ services:
     container_name: kafka
     ports:
       - "9092:9092"
+      - "7071:7071"
     volumes:
       - kafka-data:/var/lib/kafka/data
+      - ./jmx:/opt/jmx:ro
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -20,8 +22,9 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_OPTS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7071:/opt/jmx/kafka.yml"
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092"]
+      test: ["CMD-SHELL", "KAFKA_OPTS= kafka-broker-api-versions --bootstrap-server kafka:29092"]     
       interval: 10s
       timeout: 5s
       retries: 10
@@ -63,6 +66,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "8083:8083"
+      - "7072:7072"
+      - "7075:7075"
     environment:
       CONNECT_BOOTSTRAP_SERVERS: kafka:29092
       CONNECT_REST_ADVERTISED_HOST_NAME: connect
@@ -78,8 +83,10 @@ services:
       CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
       CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/plugins
+      KAFKA_OPTS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7072:/opt/jmx/connect.yml"
     volumes:
       - ./plugins:/plugins
+      - ./jmx:/opt/jmx:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
       interval: 10s
@@ -149,14 +156,18 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+    ports:
+      - "7074:7074"
     environment:
       KAFKA_BOOTSTRAP: kafka:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       STREAMS_APPLICATION_ID: log-processor
       STREAM_THREADS: "2"
-      JAVA_OPTS: -XX:MaxRAMPercentage=75
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7074:/opt/jmx/jvm.yml"
     mem_limit: 768m
     restart: on-failure
+    volumes:
+      - ./jmx:/opt/jmx:ro
 
   shipper:
     build:
@@ -168,16 +179,19 @@ services:
         condition: service_healthy
       schema-registry:
         condition: service_healthy
+    ports:
+      - "7073:7073"
+      - "8090:8090"
     environment:
       KAFKA_BOOTSTRAP: kafka:29092
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       LOGS_TOPIC: logs.raw
       FILE_GLOB: "*.log"
       JAVA_OPTS: -XX:MaxRAMPercentage=75
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7073:/opt/jmx/jvm.yml"
     volumes:
       - ../data/logs:/logs:ro
-    ports:
-      - "8090:8090"
+      - ./jmx:/opt/jmx:ro
     mem_limit: 512m
     restart: on-failure
     healthcheck:
@@ -265,10 +279,55 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/logs && mc ls local    
+      - mc alias set local http://minio:9000 minioadmin minioadmin && mc mb --ignore-existing local/logs && mc ls local 
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.10.0
+    container_name: kafka-exporter
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: ["--kafka.server=kafka:29092"]
+    ports:
+      - "9308:9308"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d   
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+  webhook-logger:
+    image: mendhak/http-https-echo:latest
+    container_name: webhook-logger
+    environment:
+      HTTP_PORT: "8080"
 
 volumes:
   kafka-data:
   opensearch-data:
   postgres-data:
+  prometheus-data:
   minio-data:
+  grafana-data:

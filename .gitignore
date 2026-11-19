@@ -22,3 +22,5 @@ generator/
 infra/plugins/*
 
 !infra/plugins/.gitkeep
+
+infra/jmx/*.jar

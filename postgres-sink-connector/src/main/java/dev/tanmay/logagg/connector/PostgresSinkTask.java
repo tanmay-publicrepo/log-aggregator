@@ -1,5 +1,8 @@
 package dev.tanmay.logagg.connector;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,6 +34,7 @@ public class PostgresSinkTask extends SinkTask {
     private long written;
     private int attempt;
     private int remainingRetries;
+    private SinkMetrics metrics;
 
     public PostgresSinkTask() {
         this(PostgresWriter::new);
@@ -48,6 +52,9 @@ public class PostgresSinkTask extends SinkTask {
     public void start(Map<String, String> props) {
         config = new PostgresSinkConfig(props);
         writer = writerFactory.apply(config);
+        MeterRegistry registry = config.metricsEnabled()? MetricsEndpoint.shared(config.metricsPort()).registry()
+        : new SimpleMeterRegistry();
+        metrics = new SinkMetrics(registry, config.tableName());
         remainingRetries = config.maxRetries();
         LOG.info("PostgresSinkTask started: table={} batchSize={} maxRetries={}",
                 config.tableName(), config.batchSize(), config.maxRetries());
@@ -71,10 +78,12 @@ public class PostgresSinkTask extends SinkTask {
             writeWithRetry(batch);
         }
     }
-        private void writeWithRetry(List<SinkRecord> batch) {
+    private void writeWithRetry(List<SinkRecord> batch) {
         try {
+            
             int inserted = writer.write(batch);
             written += inserted;
+            metrics.recordWrite(batch, inserted);
             attempt = 0;
             remainingRetries = config.maxRetries();
             LOG.debug("wrote {} rows ({} duplicates skipped), total written {}", inserted, batch.size() - inserted, written);
@@ -85,8 +94,10 @@ public class PostgresSinkTask extends SinkTask {
                 remainingRetries--;
                 context.timeout(backoff);
                 LOG.warn("write failed ({}), retrying in {} ms, {} retries left", e.getMessage(), backoff, remainingRetries);
+                metrics.recordRetry();
                 throw new RetriableException(e);
             }
+            metrics.recordFailure();
             throw new ConnectException("Giving up after " + attempt + " retries: " + e.getMessage(), e);
         }
     }

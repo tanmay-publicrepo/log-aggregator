@@ -1,5 +1,5 @@
 PY ?= python3 
-LOG_DIR ?= /tmp/logs
+LOG_DIR ?= data/logs
 Rate ?= 1000
 COMPOSE ?= docker compose -f infra/compose.yaml
 CONNECT_SH ?= infra/scripts/connect.sh
@@ -7,6 +7,10 @@ PG_CONNECTOR = postgres-sink-logs-parsed
 PG_CONFIG    = infra/connectors/postgres-sink.json
 S3_CONNECTOR = s3-sink-logs-parsed
 S3_CONFIG    = infra/connectors/s3-sink.json
+JMX_VERSION = 1.3.0
+JMX_DIR     = infra/jmx
+JMX_BASE    = https://github.com/prometheus/jmx_exporter/releases/download
+JMX_RULES   = https://raw.githubusercontent.com/prometheus/jmx_exporter/$(JMX_VERSION)/examples
 
 .PHONY: gen gen-load gen-test build test up down logs connect-plugins os-template connector-up connector-status connector-down os-count
 
@@ -91,3 +95,9 @@ s3-ls:
 
 s3-cat:
 	$(COMPOSE) exec -T minio mc cat local/logs/$(KEY) > $(notdir $(KEY))
+
+jmx-agent:
+	mkdir -p $(JMX_DIR)
+	curl -fsSL -o $(JMX_DIR)/jmx_prometheus_javaagent.jar $(JMX_BASE)/$(JMX_VERSION)/jmx_prometheus_javaagent-$(JMX_VERSION).jar
+	curl -fsSL -o $(JMX_DIR)/kafka.yml $(JMX_RULES)/kafka-2_0_0.yml
+	curl -fsSL -o $(JMX_DIR)/connect.yml $(JMX_RULES)/kafka-connect.yml

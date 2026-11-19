@@ -27,7 +27,8 @@ class PostgresSinkTaskTest {
             PostgresSinkConfig.CONNECTION_USER, "logs",
             PostgresSinkConfig.CONNECTION_PASSWORD, "logs",
             PostgresSinkConfig.MAX_RETRIES, "2",
-            PostgresSinkConfig.RETRY_BACKOFF_MS, "500");
+            PostgresSinkConfig.RETRY_BACKOFF_MS, "500",
+            PostgresSinkConfig.METRICS_ENABLED, "false");   
 
     private PostgresWriter writer;
     private SinkTaskContext context;

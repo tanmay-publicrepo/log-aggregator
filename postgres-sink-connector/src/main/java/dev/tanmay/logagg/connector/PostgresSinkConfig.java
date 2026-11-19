@@ -18,6 +18,8 @@ public class PostgresSinkConfig extends AbstractConfig {
     public static final String MAX_RETRIES = "max.retries";
     public static final String RETRY_BACKOFF_MS = "retry.backoff.ms";
     public static final String AUTO_CREATE = "auto.create";
+    public static final String METRICS_ENABLED = "metrics.enabled";
+    public static final String METRICS_PORT = "metrics.port";
 
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
@@ -36,7 +38,11 @@ public class PostgresSinkConfig extends AbstractConfig {
             .define(RETRY_BACKOFF_MS, Type.LONG, 500L, Range.atLeast(0), Importance.LOW,
                     "Pause between retries in milliseconds")
             .define(AUTO_CREATE, Type.BOOLEAN, true, Importance.LOW,
-                    "Create the target table at connector start if it does not exist");
+                    "Create the target table at connector start if it does not exist")
+             .define(METRICS_ENABLED, Type.BOOLEAN, true, Importance.LOW,
+                    "Expose Micrometer metrics on metrics.port (one endpoint per worker JVM)")
+            .define(METRICS_PORT, Type.INT, 7075, Range.atLeast(0), Importance.LOW,
+                    "Port of the /metrics endpoint; 0 picks a free port");
 
         public PostgresSinkConfig(Map<String, String> props) {
         super(CONFIG_DEF, props);
@@ -50,4 +56,6 @@ public class PostgresSinkConfig extends AbstractConfig {
     public int maxRetries()              { return getInt(MAX_RETRIES); }
     public long retryBackoffMs()         { return getLong(RETRY_BACKOFF_MS); }
     public boolean autoCreate()          { return getBoolean(AUTO_CREATE); }
+    public boolean metricsEnabled()      { return getBoolean(METRICS_ENABLED); }
+    public int metricsPort()             { return getInt(METRICS_PORT); }
 }                

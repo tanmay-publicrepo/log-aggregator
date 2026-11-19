@@ -24,6 +24,7 @@ class PostgresSinkConfigTest {
         assertThat(config.batchSize()).isEqualTo(500);
         assertThat(config.maxRetries()).isEqualTo(10);
         assertThat(config.retryBackoffMs()).isEqualTo(500L);
+        assertThat(config.metricsEnabled()).isTrue();
     }
 
     @Test

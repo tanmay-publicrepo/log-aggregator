@@ -1,0 +1,52 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: webhook-logger
+    receivers:
+      - uid: webhook-logger
+        type: webhook
+        settings:
+          url: http://webhook-logger:8080/alerts
+          httpMethod: POST
+policies:
+  - orgId: 1
+    receiver: webhook-logger
+    group_by: ["alertname", "consumergroup"]
+    group_wait: 10s
+    group_interval: 1m
+    repeat_interval: 1h
+
+groups:
+  - orgId: 1
+    name: pipeline
+    folder: log-aggregator
+    interval: 30s
+    rules:
+      - uid: consumer-lag-high
+        title: ConsumerLagHigh
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer group {{ $labels.consumergroup }} is {{ $values.A }} records behind"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum by (consumergroup) (kafka_consumergroup_lag)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1000]
